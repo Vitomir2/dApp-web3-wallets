@@ -160,10 +160,6 @@ const StateForm = (props: IStateFormProps) => {
         ];
 
         let transaction;
-        // vito - temp
-        // const eventFilter = contract.filters.ContractEvent()
-        // const events = await contract.queryFilter(eventFilter)
-        // alert(events);
         try {
             dispatch({
                 type: 'setFetching',
