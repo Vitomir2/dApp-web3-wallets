@@ -160,6 +160,10 @@ const StateForm = (props: IStateFormProps) => {
         ];
 
         let transaction;
+        // vito - temp
+        // const eventFilter = contract.filters.ContractEvent()
+        // const events = await contract.queryFilter(eventFilter)
+        // alert(events);
         try {
             dispatch({
                 type: 'setFetching',
@@ -167,8 +171,7 @@ const StateForm = (props: IStateFormProps) => {
             });
 
             transaction = await contract.submitStateResult(dataArr);
-            alert(transaction);
-            
+            console.log('transaction: ' + transaction);
             dispatch({
                 type: 'setTxn',
                 payload: transaction.hash
@@ -176,10 +179,11 @@ const StateForm = (props: IStateFormProps) => {
 
             dispatch({
                 type: 'setTxnURL',
-                payload: 'https://ropsten.etherscan.io/tx/' + transaction.hash
+                payload: 'https://rinkeby.etherscan.io/tx/' + transaction.hash
             });
 
             const transactionReceipt = await transaction.wait();
+            console.log('transactionReceipt: ' + transactionReceipt);
             if (transactionReceipt.status !== 1) {
                 // React to failure
                 showNotification("Transaction Failed.", NOTIFICATION_ERROR);
@@ -208,14 +212,7 @@ const StateForm = (props: IStateFormProps) => {
                 payload: false
             });
 
-            showNotification("Transaction Failed.", NOTIFICATION_ERROR);
-
-            // alert(err);
-
-            // const code = err.data.replace('Reverted ','');
-            // // console.log({err});
-            // const reason = ethers.utils.toUtf8String('0x' + code.substr(138));
-            // alert('revert reason: ' + reason);
+            showNotification(err.error.message, NOTIFICATION_ERROR);
         }
     }
 
@@ -228,23 +225,25 @@ const StateForm = (props: IStateFormProps) => {
         if (info.isEnded) {
           alert("Election has ended already!");
         } else {
-          const transaction = await contract?.endElection();
+            try {
+                const transaction = await contract?.endElection();
     
-          const transactionReceipt = await transaction.wait();
-          if (transactionReceipt.status !== 1) {
-            // React to failure
-            alert("Transaction failed");
-            
-            dispatch({
-                type: 'setFetching',
-                payload: false
-            });
-
-            return;
-          }
+                const transactionReceipt = await transaction.wait();
+                if (transactionReceipt.status !== 1) {
+                    // React to failure
+                    showNotification("Transaction failed", NOTIFICATION_ERROR);
+                    
+                    dispatch({
+                        type: 'setFetching',
+                        payload: false
+                    });
+                } else {
+                    setInfo({...info, isEnded: true});
+                }
+            } catch (err) {
+                showNotification(err.error.message, NOTIFICATION_ERROR);
+            }
         }
-
-        setInfo({...info, isEnded: true});
       };
 
     return (

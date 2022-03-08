@@ -229,27 +229,6 @@ class App extends React.Component<any, any> {
 
   };
 
-  public endElection = async () => {
-    const electionContract = this.state.electionContract;
-
-    this.setState({ fetching: true });
-
-    const isEnded = await electionContract?.electionEnded();
-    if (isEnded) {
-      alert("Election has ended already!");
-    } else {
-      const transaction = await electionContract?.endElection();
-
-      const transactionReceipt = await transaction.wait();
-      if (transactionReceipt.status !== 1) {
-        // React to failure
-        alert("Transaction failed");
-      }
-    }
-
-    this.setState({ fetching: false });
-  };
-
   public render = () => {
     const {
       address,
