@@ -188,7 +188,7 @@ const StateForm = (props: IStateFormProps) => {
                     type: 'setFetching',
                     payload: false
                 });
-                
+
                 return;
             }
 
@@ -265,32 +265,32 @@ const StateForm = (props: IStateFormProps) => {
                     <SFieldset>
                         <label>
                             <p>State Name</p>
-                            <input type="text" name="name" placeholder="State Name" onChange={handleUsernameChange} required disabled={info.isEnded ? false : false} />
+                            <input type="text" name="name" placeholder="State Name" onChange={handleUsernameChange} required disabled={info.isEnded ? true : false} />
                         </label>
                     </SFieldset>
 
                     <SFieldset>
                         <label>
                             <p>Votes for Biden</p>
-                            <input type="number" min="0" name="votesBiden" placeholder="Votes for Biden" onChange={handleVotesBidenChange} disabled={info.isEnded ? false : false} />
+                            <input type="number" min="0" name="votesBiden" placeholder="Votes for Biden" onChange={handleVotesBidenChange} disabled={info.isEnded ? true : false} />
                         </label>
                     </SFieldset>
 
                     <SFieldset>
                         <label>
                             <p>Votes for Trump</p>
-                            <input type="number" min="0" name="votesTrump" placeholder="Votes for Trump" onChange={handleVotesTrumpChange} disabled={info.isEnded ? false : false} />
+                            <input type="number" min="0" name="votesTrump" placeholder="Votes for Trump" onChange={handleVotesTrumpChange} disabled={info.isEnded ? true : false} />
                         </label>
                     </SFieldset>
 
                     <SFieldset>
                         <label>
                             <p>State Seats</p>
-                            <input type="number" min="0" name="stateSeats" placeholder="State Seats" onChange={handleStateSeatsChange} disabled={info.isEnded ? false : false} />
+                            <input type="number" min="0" name="stateSeats" placeholder="State Seats" onChange={handleStateSeatsChange} disabled={info.isEnded ? true : false} />
                         </label>
                     </SFieldset>
 
-                    <ConnectButton text='Submit a result' onClick={submitElectionResult} disabled={info.isEnded ? false : false} />
+                    <ConnectButton text='Submit a result' onClick={submitElectionResult} disabled={info.isEnded ? true : false} />
 
                     {state.fetching ? (
                         <Column center>
