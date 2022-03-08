@@ -4,14 +4,20 @@ import styled from 'styled-components';
 import Web3Modal from 'web3modal';
 // @ts-ignore
 import WalletConnectProvider from '@walletconnect/web3-provider';
+import { Web3Provider } from '@ethersproject/providers';
+import { Contract } from '@ethersproject/contracts';
+
 import Column from './components/Column';
 import Wrapper from './components/Wrapper';
 import Header from './components/Header';
 import Loader from './components/Loader';
 import ConnectButton from './components/ConnectButton';
+import StateForm from './components/StateForm';
 
-import { Web3Provider } from '@ethersproject/providers';
-import { getChainData } from './helpers/utilities';
+import { getChainData, NOTIFICATION_ERROR, NOTIFICATION_SUCCESS, showNotification } from './helpers/utilities';
+import { US_ELECTION_ADDRESS } from './constants';
+import { US_ELECTION } from './constants/abis/USElection';
+import { getContract } from './helpers/ethers'
 
 const SLayout = styled.div`
   position: relative;
@@ -56,8 +62,21 @@ interface IAppState {
   chainId: number;
   pendingRequest: boolean;
   result: any | null;
-  electionContract: any | null;
-  info: any | null;
+  electionContract: Contract | null;
+  currentLeader: number | null;
+  seatsBiden: number | null;
+  seatsTrump: number | null;
+  isEnded: boolean | null;
+  transactionHash: string | null;
+  submissionFormSate: ISubmissionFormState | null;
+}
+
+interface ISubmissionFormState {
+  name: string;
+  votesBiden: number | null;
+  votesTrump: number | null;
+  stateSeats: number | null;
+  isEnded: boolean | null;
 }
 
 const INITIAL_STATE: IAppState = {
@@ -69,7 +88,12 @@ const INITIAL_STATE: IAppState = {
   pendingRequest: false,
   result: null,
   electionContract: null,
-  info: null
+  currentLeader: null,
+  seatsBiden: null,
+  seatsTrump: null,
+  isEnded: null,
+  transactionHash: null,
+  submissionFormSate: null
 };
 
 class App extends React.Component<any, any> {
@@ -77,6 +101,7 @@ class App extends React.Component<any, any> {
   public web3Modal: Web3Modal;
   public state: IAppState;
   public provider: any;
+  public electionContract: Contract;
 
   constructor(props: any) {
     super(props);
@@ -98,7 +123,14 @@ class App extends React.Component<any, any> {
   }
 
   public onConnect = async () => {
-    this.provider = await this.web3Modal.connect();
+    try {
+      this.provider = await this.web3Modal.connect();
+
+      showNotification('Connection Successful.', NOTIFICATION_SUCCESS);
+    } catch (err) {
+      showNotification('Connection Failed.', NOTIFICATION_ERROR);
+      return;
+    }
 
     const library = new Web3Provider(this.provider);
 
@@ -106,15 +138,27 @@ class App extends React.Component<any, any> {
 
     const address = this.provider.selectedAddress ? this.provider.selectedAddress : this.provider?.accounts[0];
 
+    // get the contract
+    this.electionContract = getContract(US_ELECTION_ADDRESS, US_ELECTION.abi, library, address);
+
+    const currentLeader = await this.electionContract?.currentLeader();
+    const seatsBiden = await this.electionContract?.seats(1);
+    const seatsTrump = await this.electionContract?.seats(2);
+    const isEnded = await this.electionContract?.electionEnded();
+
     await this.setState({
       library,
       chainId: network.chainId,
       address,
-      connected: true
+      connected: true,
+      electionContract: this.electionContract,
+      currentLeader,
+      seatsBiden,
+      seatsTrump,
+      isEnded
     });
 
     await this.subscribeToProviderEvents(this.provider);
-
   };
 
   public subscribeToProviderEvents = async (provider:any) => {
@@ -131,7 +175,7 @@ class App extends React.Component<any, any> {
 
   public async unSubscribe(provider:any) {
     // Workaround for metamask widget > 9.0.3 (provider.off is undefined);
-    window.location.reload(false);
+    window.location.reload();
     if (!provider.off) {
       return;
     }
@@ -185,13 +229,39 @@ class App extends React.Component<any, any> {
 
   };
 
+  public endElection = async () => {
+    const electionContract = this.state.electionContract;
+
+    this.setState({ fetching: true });
+
+    const isEnded = await electionContract?.electionEnded();
+    if (isEnded) {
+      alert("Election has ended already!");
+    } else {
+      const transaction = await electionContract?.endElection();
+
+      const transactionReceipt = await transaction.wait();
+      if (transactionReceipt.status !== 1) {
+        // React to failure
+        alert("Transaction failed");
+      }
+    }
+
+    this.setState({ fetching: false });
+  };
+
   public render = () => {
     const {
       address,
       connected,
       chainId,
-      fetching
+      fetching,
+      currentLeader,
+      seatsBiden,
+      seatsTrump,
+      isEnded
     } = this.state;
+
     return (
       <SLayout>
         <Column maxWidth={1000} spanHeight>
@@ -201,19 +271,26 @@ class App extends React.Component<any, any> {
             chainId={chainId}
             killSession={this.resetApp}
           />
-          <SContent>
-            {fetching ? (
-              <Column center>
-                <SContainer>
-                  <Loader />
-                </SContainer>
-              </Column>
-            ) : (
+          {
+            !this.state.connected &&
+            <SContent>
+              {fetching ? (
+                <Column center>
+                  <SContainer>
+                    <Loader />
+                  </SContainer>
+                </Column>
+              ) : (
                 <SLanding center>
-                  {!this.state.connected && <ConnectButton onClick={this.onConnect} />}
+                  <ConnectButton text='Connect' onClick={this.onConnect} />
                 </SLanding>
               )}
-          </SContent>
+            </SContent>
+          }
+
+          {
+            this.state.connected && <StateForm formText='State Submission Form' contract={this.electionContract} currentLeader={currentLeader} seatsBiden={seatsBiden} seatsTrump={seatsTrump} isEnded={isEnded} />
+          }
         </Column>
       </SLayout>
     );

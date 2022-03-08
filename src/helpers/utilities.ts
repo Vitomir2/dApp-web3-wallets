@@ -4,6 +4,8 @@ import '../../node_modules/noty/lib/noty.css';
 import '../../node_modules/noty/lib/themes/mint.css';  
 
 const NOTIFICATION_TIMEOUT = 3500;
+export const NOTIFICATION_SUCCESS = 'success';
+export const NOTIFICATION_ERROR = 'error';
 
 export function capitalize(string: string): string {
   return string
@@ -133,11 +135,11 @@ export function getChainData(chainId: number): any {
   return chainData;
 }
 
-export function showNotification(text:string) {
+export function showNotification(text: string, notificationType: typeof NOTIFICATION_SUCCESS | typeof NOTIFICATION_ERROR) {
     new Noty({ 
       text,
       timeout: NOTIFICATION_TIMEOUT,
-      type: 'success'
+      type: notificationType
       
   }).show();
 }
