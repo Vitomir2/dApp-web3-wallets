@@ -19,6 +19,7 @@ interface IConnectButtonStyleProps {
 }
 
 interface IConnectButtonProps extends IConnectButtonStyleProps {
+  text: string,
   onClick?: any
 }
 
@@ -124,7 +125,7 @@ const ConnectButton = (props: IConnectButtonProps) => (
     >
       <SHoverLayer />
       <SIcon />
-      {'Connect'}
+      {props.text}
     </SConnectButton>
   </SConnectButtonContainer>
 )

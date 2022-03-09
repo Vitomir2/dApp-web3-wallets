@@ -4,14 +4,19 @@ import styled from 'styled-components';
 import Web3Modal from 'web3modal';
 // @ts-ignore
 import WalletConnectProvider from '@walletconnect/web3-provider';
+import { Web3Provider } from '@ethersproject/providers';
+import { Contract } from '@ethersproject/contracts';
+
 import Column from './components/Column';
 import Wrapper from './components/Wrapper';
 import Header from './components/Header';
 import Loader from './components/Loader';
 import ConnectButton from './components/ConnectButton';
-
-import { Web3Provider } from '@ethersproject/providers';
-import { getChainData } from './helpers/utilities';
+import { getChainData, NOTIFICATION_ERROR, NOTIFICATION_SUCCESS, showNotification } from './helpers/utilities';
+import { getContract } from './helpers/ethers'
+import { BOOK_LIBRARY_ADDRESS } from './constants/contracts';
+import { BOOK_LIBRARY } from './constants/abis/BookLibrary';
+import LibraryInteract from './components/LibraryInteractions';
 
 const SLayout = styled.div`
   position: relative;
@@ -56,7 +61,7 @@ interface IAppState {
   chainId: number;
   pendingRequest: boolean;
   result: any | null;
-  electionContract: any | null;
+  libraryContract: any | null;
   info: any | null;
 }
 
@@ -68,7 +73,7 @@ const INITIAL_STATE: IAppState = {
   chainId: 1,
   pendingRequest: false,
   result: null,
-  electionContract: null,
+  libraryContract: null,
   info: null
 };
 
@@ -77,6 +82,7 @@ class App extends React.Component<any, any> {
   public web3Modal: Web3Modal;
   public state: IAppState;
   public provider: any;
+  public libraryContract: Contract;
 
   constructor(props: any) {
     super(props);
@@ -98,7 +104,14 @@ class App extends React.Component<any, any> {
   }
 
   public onConnect = async () => {
-    this.provider = await this.web3Modal.connect();
+    try {
+      this.provider = await this.web3Modal.connect();
+
+      showNotification('Connection Successful.', NOTIFICATION_SUCCESS);
+    } catch (err) {
+      showNotification('Connection Failed.', NOTIFICATION_ERROR);
+      return;
+    }
 
     const library = new Web3Provider(this.provider);
 
@@ -106,11 +119,15 @@ class App extends React.Component<any, any> {
 
     const address = this.provider.selectedAddress ? this.provider.selectedAddress : this.provider?.accounts[0];
 
+    // get the contract
+    this.libraryContract = getContract(BOOK_LIBRARY_ADDRESS, BOOK_LIBRARY.abi, library, address);
+
     await this.setState({
       library,
       chainId: network.chainId,
       address,
-      connected: true
+      connected: true,
+      libraryContract: this.libraryContract
     });
 
     await this.subscribeToProviderEvents(this.provider);
@@ -131,7 +148,7 @@ class App extends React.Component<any, any> {
 
   public async unSubscribe(provider:any) {
     // Workaround for metamask widget > 9.0.3 (provider.off is undefined);
-    window.location.reload(false);
+    window.location.reload();
     if (!provider.off) {
       return;
     }
@@ -201,19 +218,26 @@ class App extends React.Component<any, any> {
             chainId={chainId}
             killSession={this.resetApp}
           />
-          <SContent>
-            {fetching ? (
-              <Column center>
-                <SContainer>
-                  <Loader />
-                </SContainer>
-              </Column>
-            ) : (
+          {
+            !this.state.connected &&
+            <SContent>
+              {fetching ? (
+                <Column center>
+                  <SContainer>
+                    <Loader />
+                  </SContainer>
+                </Column>
+              ) : (
                 <SLanding center>
-                  {!this.state.connected && <ConnectButton onClick={this.onConnect} />}
+                  <ConnectButton text='Connect' onClick={this.onConnect} />
                 </SLanding>
               )}
-          </SContent>
+            </SContent>
+          }
+
+          {
+            this.state.connected && <LibraryInteract contract={ this.libraryContract } />
+          }
         </Column>
       </SLayout>
     );
