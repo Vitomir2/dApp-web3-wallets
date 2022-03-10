@@ -1,10 +1,4 @@
-// Have a UI to create book, rent a book, return a book, see books available and their copies
-// Connect the corresponding calls and transactions
-// Wait for transactions (loading)
-// React on transaction results (update state)
-// Handle errors and faulty transactions (error handling)
-
-import { Contract } from "ethers";
+import { Contract, ethers } from "ethers";
 import React, { useState } from "react";
 import { NOTIFICATION_ERROR, NOTIFICATION_SUCCESS, showNotification } from "src/helpers/utilities";
 import styled from "styled-components";
@@ -14,6 +8,9 @@ import Loader from "./Loader";
 
 interface ILibraryProps {
     contract: Contract,
+    tokenWrappedContract: Contract,
+    tokenContract: Contract,
+    walletAddress: string
 }
 
 interface ILibraryWriteState {
@@ -36,12 +33,21 @@ const INITIAL_STATE: ILibraryWriteState = {
     fetching: false
 }
 
+interface ITokenInteractState {
+    amount: number | null;
+}
+
+const INITIAL_TOKEN_STATE: ITokenInteractState = {
+    amount: null,
+}
+
 const SContainer = styled.div`
     width: 100%
     text-align: center;
 `;
 
 const SBContainer = styled.div`
+    margin-right: 1%;
     display: inline-block;
 `;
 
@@ -55,69 +61,41 @@ const SAnchor = styled.a`
     border-bottom: 1px solid blue;
 `
 
+const REQUIRED_LIB_AMOUNT = 0.1;
+
 const LibraryInteract = (props: ILibraryProps) => {;
     const contract = props.contract;
+    const tokenWrappedContract = props.tokenWrappedContract;
+    const tokenContract = props.tokenContract;
+    const wallet = props.walletAddress;
     const [bookState, setBookState] = useState(INITIAL_STATE);
     let bookName = "";
     let bookCopies = 0;
     let bookOwnedByUser = "";
+    const [userBal, setUserBal] = useState(0.0);
+    const [tokenState, setTokenState] = useState(INITIAL_TOKEN_STATE);
 
     const handleBookNameChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
         setBookState({...bookState, bookName: event.target.value})
     };
 
     const handleCopiesChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
-        const copies = parseInt (event.target.value, 0);
+        const copies = parseInt(event.target.value, 0);
         setBookState({...bookState, copies})
     };
 
+    const handleSendAmountChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+        const amount = parseFloat(event.target.value);
+        setTokenState({ amount });
+    };
+
     const handleBookBorrowNameChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
-        setBookState({...bookState, chosenBook: event.target.value})
+        setBookState({...bookState, chosenBook: event.target.value});
     };
 
     const handleBookInfoNameChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
         setBookState({...bookState, bookInfoName: event.target.value})
     };
-
-    async function bookAction(isBorrow: boolean) {
-        if (bookState.chosenBook === "") {
-            alert("Book to Borrow field is mandatory!");
-            return;
-        }
-
-        let transaction;
-        try {
-            setBookState({...bookState, fetching: true})
-            
-            if (isBorrow) {
-                transaction = await contract.borrowBook(bookState.chosenBook);
-            } else {
-                transaction = await contract.returnBook(bookState.chosenBook);
-            }
-            
-            setBookState({...bookState, transactionHash: transaction.hash})
-            setBookState({...bookState, txnURL: 'https://ropsten.etherscan.io/tx/' + transaction.hash})
-
-            const transactionReceipt = await transaction.wait();
-            if (transactionReceipt.status !== 1) {
-                // React to failure
-                showNotification("Transaction Failed.", NOTIFICATION_ERROR);
-
-                setBookState({...bookState, chosenBook: "", fetching: false})
-
-                return;
-            }
-
-            setBookState({...bookState, chosenBook: "", fetching: false})
-
-            showNotification("Transaction processed successfully.", NOTIFICATION_SUCCESS);
-        } catch (err) {
-            setBookState({...bookState, chosenBook: "", fetching: false})
-
-            showNotification(err.error.message, NOTIFICATION_ERROR);
-        }
-    }
-
 
     const addBook = async () => {
         if (bookState.bookName === "" || bookState.copies === 0) {
@@ -150,16 +128,94 @@ const LibraryInteract = (props: ILibraryProps) => {;
         } catch (err) {
             setBookState({...bookState, bookName: "", copies: 0, fetching: false})
 
-            showNotification(err.error.message, NOTIFICATION_ERROR);
+            showNotification(err.message, NOTIFICATION_ERROR);
         }
     }
 
     const BorrowBook = async () => {
-        bookAction(true);
+        if (bookState.chosenBook === "") {
+            alert("Book to Borrow field is mandatory!");
+            return;
+        }
+
+        const bal =  await getUserBalance(wallet);
+        const realValue = parseFloat(ethers.utils.formatEther(bal));
+        if (realValue < REQUIRED_LIB_AMOUNT) {
+            const messageTxt = "There is no enough LIB to borrow the Book. You need at least " + REQUIRED_LIB_AMOUNT + " LIB.";
+            alert(messageTxt);
+            return;
+        } else {
+            const confirmBox = window.confirm("Do you really want to pay " + REQUIRED_LIB_AMOUNT + " LIB?");
+            if (confirmBox === false) {
+                return;
+            }
+        }
+
+        let transaction;
+        try {
+            const rentAmount = ethers.utils.parseEther(REQUIRED_LIB_AMOUNT.toString());
+            await tokenContract.transferFrom(wallet, contract.address, rentAmount);
+            
+            setBookState({...bookState, fetching: true})
+            
+            transaction = await contract.borrowBook(bookState.chosenBook);
+            
+            setBookState({...bookState, transactionHash: transaction.hash})
+            setBookState({...bookState, txnURL: 'https://ropsten.etherscan.io/tx/' + transaction.hash})
+
+            const transactionReceipt = await transaction.wait();
+            if (transactionReceipt.status !== 1) {
+                // React to failure
+                showNotification("Transaction Failed.", NOTIFICATION_ERROR);
+
+                setBookState({...bookState, chosenBook: "", fetching: false})
+
+                return;
+            }
+
+            setBookState({...bookState, chosenBook: "", fetching: false})
+
+            showNotification("Transaction processed successfully.", NOTIFICATION_SUCCESS);
+        } catch (err) {
+            setBookState({...bookState, chosenBook: "", fetching: false})
+
+            showNotification(err.message, NOTIFICATION_ERROR);
+        }
     }
 
     const ReturnBook = async () => {
-        bookAction(false);
+        if (bookState.chosenBook === "") {
+            alert("Book to Borrow field is mandatory!");
+            return;
+        }
+
+        let transaction;
+        try {
+            setBookState({...bookState, fetching: true})
+            
+            transaction = await contract.returnBook(bookState.chosenBook);
+            
+            setBookState({...bookState, transactionHash: transaction.hash})
+            setBookState({...bookState, txnURL: 'https://ropsten.etherscan.io/tx/' + transaction.hash})
+
+            const transactionReceipt = await transaction.wait();
+            if (transactionReceipt.status !== 1) {
+                // React to failure
+                showNotification("Transaction Failed.", NOTIFICATION_ERROR);
+
+                setBookState({...bookState, chosenBook: "", fetching: false})
+
+                return;
+            }
+
+            setBookState({...bookState, chosenBook: "", fetching: false})
+
+            showNotification("Transaction processed successfully.", NOTIFICATION_SUCCESS);
+        } catch (err) {
+            setBookState({...bookState, chosenBook: "", fetching: false})
+
+            showNotification(err.message, NOTIFICATION_ERROR);
+        }
     }
 
     const getBookInfo = async () => {
@@ -184,8 +240,69 @@ const LibraryInteract = (props: ILibraryProps) => {;
         } catch (err) {
             setBookState({...bookState, bookInfoName: ""});
 
-            showNotification(err.error.message, NOTIFICATION_ERROR);
+            showNotification(err.message, NOTIFICATION_ERROR);
         }
+    }
+
+    async function getUserBalance(_wallet: string) {
+        return await tokenContract.balanceOf(_wallet);
+    }
+
+    async function setUserBalance() {
+        const bal =  await getUserBalance(wallet);
+        const realValue = ethers.utils.formatEther(bal);
+        setUserBal(parseFloat(realValue));
+    }
+
+    async function sendLIB() {
+        if (!tokenState.amount || tokenState.amount === 0) {
+            alert("The amount field is mandatory and needs to be more than 0.");
+            return;
+        }
+
+        const wrapAmount = tokenState.amount ? tokenState.amount.toString() : "";
+        const wrapValue = ethers.utils.parseEther(wrapAmount);
+        
+        try {
+            const wrapTx = await tokenWrappedContract.wrap({ value: wrapValue });
+            await wrapTx.wait();
+        } catch (err) {
+            showNotification(err.message, NOTIFICATION_ERROR);
+        }
+
+        console.log(" LIB wrapped ");
+        setTokenState({ amount: 0 });
+    }
+
+    async function receiveLIB() {
+        if (!tokenState.amount || tokenState.amount === 0) {
+            alert("The amount field is mandatory and needs to be more than 0.");
+            return;
+        }
+
+        const wrapAmount = tokenState.amount ? tokenState.amount.toString() : "";
+        const wrapValue = ethers.utils.parseEther(wrapAmount);
+
+        try {
+            console.log("wrapped contract addr: ", tokenWrappedContract.address);
+            const approveTx = await tokenContract.approve(tokenWrappedContract.address, wrapValue);
+            await approveTx.wait();
+            console.log(' Approve done! ');
+            
+            const unwrapTx = await tokenWrappedContract.unwrap(wrapValue);
+            await unwrapTx.wait();
+            console.log(' Unwrap done! ');
+        } catch(err) {
+            showNotification(err.message, NOTIFICATION_ERROR);
+            // if (err.code === 4001) {
+            //     showNotification(err.message, NOTIFICATION_ERROR);
+            // } else {
+            //     console.log(err);
+            //     showNotification("Transaction failed", NOTIFICATION_ERROR);
+            // }
+        }
+
+        setTokenState({ amount: 0 });
     }
 
     return (
@@ -248,6 +365,37 @@ const LibraryInteract = (props: ILibraryProps) => {;
                         )}
                     </SFieldset>
                     <ConnectButton text="Book Info" onClick={getBookInfo} />
+                    <p>Token Wrapped contract { tokenWrappedContract.address }</p>
+                    <p>Token contract { tokenContract.address }</p>
+
+                    <SContainer>
+                        <SBContainer>
+                            <button onClick={ setUserBalance }>Get user LIB balance</button>
+                        </SBContainer>
+                        
+                        <SBContainer>
+                            <p>User bal: { userBal }</p>
+                        </SBContainer>
+                    </SContainer>
+
+                    <SFieldset>
+                        <label>
+                            <p>Amount to wrap or unwrap</p>
+                            <input type="number" min="0" name="amount" placeholder="Amount to wrap/unwrap" onChange={handleSendAmountChange} />
+                        </label>
+                    </SFieldset>
+
+                    <SContainer>
+                        <SBContainer>
+                            <button onClick={ sendLIB }>Wrap LIB</button>
+                        </SBContainer>
+                        
+                        <SBContainer>
+                            <button onClick={ receiveLIB }>Unwrap LIB</button>
+                        </SBContainer>
+                    </SContainer>
+
+                    <p>{ tokenState.amount }</p>
                 </SContainer>
             )}
         </div>

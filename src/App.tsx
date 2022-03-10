@@ -14,8 +14,10 @@ import Loader from './components/Loader';
 import ConnectButton from './components/ConnectButton';
 import { getChainData, NOTIFICATION_ERROR, NOTIFICATION_SUCCESS, showNotification } from './helpers/utilities';
 import { getContract } from './helpers/ethers'
-import { BOOK_LIBRARY_ADDRESS } from './constants/contracts';
+import { BOOK_LIBRARY_ADDRESS, LIB_WRAPPED_ADDRESS } from './constants/contracts';
 import { BOOK_LIBRARY } from './constants/abis/BookLibrary';
+import { LIB_WRAPPED_TOKEN } from './constants/abis/LIBWrapped';
+import { LIB_TOKEN } from './constants/abis/LIBToken';
 import LibraryInteract from './components/LibraryInteractions';
 
 const SLayout = styled.div`
@@ -83,6 +85,8 @@ class App extends React.Component<any, any> {
   public state: IAppState;
   public provider: any;
   public libraryContract: Contract;
+  public tokenWrappedContract: Contract;
+  public tokenContract: Contract;
 
   constructor(props: any) {
     super(props);
@@ -121,6 +125,11 @@ class App extends React.Component<any, any> {
 
     // get the contract
     this.libraryContract = getContract(BOOK_LIBRARY_ADDRESS, BOOK_LIBRARY.abi, library, address);
+
+    // get the token contract
+    this.tokenWrappedContract = getContract(LIB_WRAPPED_ADDRESS, LIB_WRAPPED_TOKEN.abi, library, address);
+    const tokenAddress = await this.tokenWrappedContract.WLIBToken();
+    this.tokenContract = getContract(tokenAddress, LIB_TOKEN.abi, library, address);
 
     await this.setState({
       library,
@@ -235,9 +244,7 @@ class App extends React.Component<any, any> {
             </SContent>
           }
 
-          {
-            this.state.connected && <LibraryInteract contract={ this.libraryContract } />
-          }
+          { this.state.connected && <LibraryInteract contract={ this.libraryContract } tokenWrappedContract={ this.tokenWrappedContract } tokenContract={ this.tokenContract } walletAddress={ this.state.address } /> }
         </Column>
       </SLayout>
     );
