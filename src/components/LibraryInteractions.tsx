@@ -61,7 +61,7 @@ const SAnchor = styled.a`
     border-bottom: 1px solid blue;
 `
 
-const REQUIRED_LIB_AMOUNT = 0.1;
+// const REQUIRED_LIB_AMOUNT = 0.1;
 
 const LibraryInteract = (props: ILibraryProps) => {;
     const contract = props.contract;
@@ -109,8 +109,15 @@ const LibraryInteract = (props: ILibraryProps) => {;
             
             transaction = await contract.addBook(bookState.bookName, bookState.copies);
             
+            contract.on('AddBook', (bookName, availableCopies, tx) => {
+                showNotification("addBook event fired---", NOTIFICATION_SUCCESS);
+                console.log("testing book name hook: ", bookName);
+                console.log("testing copies hook: ", availableCopies);
+                console.log("testing tx address hook: ", tx.transactionHash);
+            });
+
             setBookState({...bookState, transactionHash: transaction.hash})
-            setBookState({...bookState, txnURL: 'https://ropsten.etherscan.io/tx/' + transaction.hash})
+            setBookState({...bookState, txnURL: 'https://rinkeby.etherscan.io/tx/' + transaction.hash})
 
             const transactionReceipt = await transaction.wait();
             if (transactionReceipt.status !== 1) {
@@ -122,13 +129,13 @@ const LibraryInteract = (props: ILibraryProps) => {;
                 return;
             }
 
-            setBookState({...bookState, bookName: "", copies: 0, fetching: false})
-
             showNotification("Transaction processed successfully.", NOTIFICATION_SUCCESS);
-        } catch (err) {
-            setBookState({...bookState, bookName: "", copies: 0, fetching: false})
 
+            setBookState({...bookState, bookName: "", copies: 0, fetching: false})
+        } catch (err) {
             showNotification(err.message, NOTIFICATION_ERROR);
+
+            setBookState({...bookState, bookName: "", copies: 0, fetching: false})
         }
     }
 
@@ -138,30 +145,44 @@ const LibraryInteract = (props: ILibraryProps) => {;
             return;
         }
 
-        const bal =  await getUserBalance(wallet);
-        const realValue = parseFloat(ethers.utils.formatEther(bal));
-        if (realValue < REQUIRED_LIB_AMOUNT) {
-            const messageTxt = "There is no enough LIB to borrow the Book. You need at least " + REQUIRED_LIB_AMOUNT + " LIB.";
-            alert(messageTxt);
-            return;
-        } else {
-            const confirmBox = window.confirm("Do you really want to pay " + REQUIRED_LIB_AMOUNT + " LIB?");
-            if (confirmBox === false) {
-                return;
-            }
-        }
+        // vito - temporary hide the token functionality
+        // const bal =  await getUserBalance(wallet);
+        // const realValue = parseFloat(ethers.utils.formatEther(bal));
+        // if (realValue < REQUIRED_LIB_AMOUNT) {
+        //     const messageTxt = "There is no enough LIB to borrow the Book. You need at least " + REQUIRED_LIB_AMOUNT + " LIB.";
+        //     alert(messageTxt);
+        //     return;
+        // } else {
+        //     const confirmBox = window.confirm("Do you really want to pay " + REQUIRED_LIB_AMOUNT + " LIB?");
+        //     if (confirmBox === false) {
+        //         return;
+        //     }
+        // }
 
         let transaction;
         try {
-            const rentAmount = ethers.utils.parseEther(REQUIRED_LIB_AMOUNT.toString());
-            await tokenContract.transferFrom(wallet, contract.address, rentAmount);
+            // vito - temporary hide the token functionality
+            // const rentAmount = ethers.utils.parseEther(REQUIRED_LIB_AMOUNT.toString());
+            // const approveTx = await tokenContract.approve(contract.address, rentAmount);
+            // await approveTx.wait();
+            // console.log(' Approve done! ');
+
+            // await tokenContract.transferFrom(wallet, contract.address, rentAmount);
             
             setBookState({...bookState, fetching: true})
-            
+
             transaction = await contract.borrowBook(bookState.chosenBook);
+
+            contract.on('OrderResult', (bookName, availableCopies, customerAddr, tx) => {
+                showNotification("OrderResult event fired---", NOTIFICATION_SUCCESS);
+                console.log("testing book name hook: ", bookName);
+                console.log("testing copies hook: ", availableCopies);
+                console.log("testing customer addr hook: ", customerAddr);
+                console.log("testing tx address hook: ", tx.transactionHash);
+            });
             
             setBookState({...bookState, transactionHash: transaction.hash})
-            setBookState({...bookState, txnURL: 'https://ropsten.etherscan.io/tx/' + transaction.hash})
+            setBookState({...bookState, txnURL: 'https://rinkeby.etherscan.io/tx/' + transaction.hash})
 
             const transactionReceipt = await transaction.wait();
             if (transactionReceipt.status !== 1) {
@@ -196,7 +217,7 @@ const LibraryInteract = (props: ILibraryProps) => {;
             transaction = await contract.returnBook(bookState.chosenBook);
             
             setBookState({...bookState, transactionHash: transaction.hash})
-            setBookState({...bookState, txnURL: 'https://ropsten.etherscan.io/tx/' + transaction.hash})
+            setBookState({...bookState, txnURL: 'https://rinkeby.etherscan.io/tx/' + transaction.hash})
 
             const transactionReceipt = await transaction.wait();
             if (transactionReceipt.status !== 1) {
@@ -365,37 +386,43 @@ const LibraryInteract = (props: ILibraryProps) => {;
                         )}
                     </SFieldset>
                     <ConnectButton text="Book Info" onClick={getBookInfo} />
-                    <p>Token Wrapped contract { tokenWrappedContract.address }</p>
-                    <p>Token contract { tokenContract.address }</p>
+                    
+                    {
+                        false && 
+                        <SContainer>
+                            <p>Token Wrapped contract { tokenWrappedContract.address }</p>
+                            <p>Token contract { tokenContract.address }</p>
+                            
+                            <SContainer>
+                                <SBContainer>
+                                    <button onClick={ setUserBalance }>Get user LIB balance</button>
+                                </SBContainer>
+                                
+                                <SBContainer>
+                                    <p>User bal: { userBal }</p>
+                                </SBContainer>
+                            </SContainer>
 
-                    <SContainer>
-                        <SBContainer>
-                            <button onClick={ setUserBalance }>Get user LIB balance</button>
-                        </SBContainer>
-                        
-                        <SBContainer>
-                            <p>User bal: { userBal }</p>
-                        </SBContainer>
-                    </SContainer>
+                            <SFieldset>
+                                <label>
+                                    <p>Amount to wrap or unwrap</p>
+                                    <input type="number" min="0" name="amount" placeholder="Amount to wrap/unwrap" onChange={handleSendAmountChange} />
+                                </label>
+                            </SFieldset>
 
-                    <SFieldset>
-                        <label>
-                            <p>Amount to wrap or unwrap</p>
-                            <input type="number" min="0" name="amount" placeholder="Amount to wrap/unwrap" onChange={handleSendAmountChange} />
-                        </label>
-                    </SFieldset>
+                            <SContainer>
+                                <SBContainer>
+                                    <button onClick={ sendLIB }>Wrap LIB</button>
+                                </SBContainer>
+                                
+                                <SBContainer>
+                                    <button onClick={ receiveLIB }>Unwrap LIB</button>
+                                </SBContainer>
+                            </SContainer>
 
-                    <SContainer>
-                        <SBContainer>
-                            <button onClick={ sendLIB }>Wrap LIB</button>
-                        </SBContainer>
-                        
-                        <SBContainer>
-                            <button onClick={ receiveLIB }>Unwrap LIB</button>
-                        </SBContainer>
-                    </SContainer>
-
-                    <p>{ tokenState.amount }</p>
+                            <p>{ tokenState.amount }</p>
+                        </SContainer>
+                    }
                 </SContainer>
             )}
         </div>

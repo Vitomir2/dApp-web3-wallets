@@ -14,10 +14,10 @@ import Loader from './components/Loader';
 import ConnectButton from './components/ConnectButton';
 import { getChainData, NOTIFICATION_ERROR, NOTIFICATION_SUCCESS, showNotification } from './helpers/utilities';
 import { getContract } from './helpers/ethers'
-import { BOOK_LIBRARY_ADDRESS, LIB_WRAPPED_ADDRESS } from './constants/contracts';
+import { BOOK_LIBRARY_ADDRESS } from './constants/contracts';
 import { BOOK_LIBRARY } from './constants/abis/BookLibrary';
-import { LIB_WRAPPED_TOKEN } from './constants/abis/LIBWrapped';
-import { LIB_TOKEN } from './constants/abis/LIBToken';
+// import { LIB_WRAPPED_TOKEN } from './constants/abis/LIBWrapped';
+// import { LIB_TOKEN } from './constants/abis/LIBToken';
 import LibraryInteract from './components/LibraryInteractions';
 
 const SLayout = styled.div`
@@ -127,9 +127,10 @@ class App extends React.Component<any, any> {
     this.libraryContract = getContract(BOOK_LIBRARY_ADDRESS, BOOK_LIBRARY.abi, library, address);
 
     // get the token contract
-    this.tokenWrappedContract = getContract(LIB_WRAPPED_ADDRESS, LIB_WRAPPED_TOKEN.abi, library, address);
-    const tokenAddress = await this.tokenWrappedContract.WLIBToken();
-    this.tokenContract = getContract(tokenAddress, LIB_TOKEN.abi, library, address);
+    // vito - temporary hide the token functionality
+    // this.tokenWrappedContract = getContract(LIB_WRAPPED_ADDRESS, LIB_WRAPPED_TOKEN.abi, library, address);
+    // const tokenAddress = await this.tokenWrappedContract.WLIBToken();
+    // this.tokenContract = getContract(tokenAddress, LIB_TOKEN.abi, library, address);
 
     await this.setState({
       library,
@@ -208,6 +209,17 @@ class App extends React.Component<any, any> {
     await this.unSubscribe(this.provider);
 
     this.setState({ ...INITIAL_STATE });
+
+    this.libraryContract.on('AddBook', (bookName, availableCopies, tx) => {
+      tx.removeListener();
+      console.log("removed AddBook listeners --- ");
+    });
+
+    this.libraryContract.on('OrderResult', (bookName, availableCopies, customerAddr, tx) => {
+      tx.removeListener();
+      console.log("removed OrderResult listeners --- ");
+      showNotification("remove listener fired ---", NOTIFICATION_SUCCESS);
+    });
 
   };
 
