@@ -6,6 +6,7 @@ import Web3Modal from 'web3modal';
 import WalletConnectProvider from '@walletconnect/web3-provider';
 import { Web3Provider } from '@ethersproject/providers';
 import { Contract } from '@ethersproject/contracts';
+import { ethers } from 'ethers';
 
 import Column from './components/Column';
 import Wrapper from './components/Wrapper';
@@ -14,7 +15,7 @@ import Loader from './components/Loader';
 import ConnectButton from './components/ConnectButton';
 import { getChainData, NOTIFICATION_ERROR, NOTIFICATION_SUCCESS, showNotification } from './helpers/utilities';
 import { getContract } from './helpers/ethers'
-import { BOOK_LIBRARY_ADDRESS } from './constants/contracts';
+import { BOOK_LIBRARY_ADDRESS, LIB_WRAPPED_ADDRESS } from './constants/contracts';
 import { BOOK_LIBRARY } from './constants/abis/BookLibrary';
 // import { LIB_WRAPPED_TOKEN } from './constants/abis/LIBWrapped';
 // import { LIB_TOKEN } from './constants/abis/LIBToken';
@@ -59,6 +60,7 @@ interface IAppState {
   fetching: boolean;
   address: string;
   library: any;
+  signer: any;
   connected: boolean;
   chainId: number;
   pendingRequest: boolean;
@@ -71,6 +73,7 @@ const INITIAL_STATE: IAppState = {
   fetching: false,
   address: '',
   library: null,
+  signer: null,
   connected: false,
   chainId: 1,
   pendingRequest: false,
@@ -119,11 +122,25 @@ class App extends React.Component<any, any> {
 
     const library = new Web3Provider(this.provider);
 
+    const signer = library.getSigner();
+
     const network = await library.getNetwork();
 
     const address = this.provider.selectedAddress ? this.provider.selectedAddress : this.provider?.accounts[0];
 
     // get the contract
+    if (!ethers.utils.isAddress(address)) {
+      showNotification(address + " is not a valid address.", NOTIFICATION_ERROR);
+    }
+
+    if (!ethers.utils.isAddress(BOOK_LIBRARY_ADDRESS)) {
+      showNotification(BOOK_LIBRARY_ADDRESS + " is not a valid address.", NOTIFICATION_ERROR);
+    }
+
+    if (!ethers.utils.isAddress(LIB_WRAPPED_ADDRESS)) {
+      showNotification(LIB_WRAPPED_ADDRESS + " is not a valid address.", NOTIFICATION_ERROR);
+    }
+    
     this.libraryContract = getContract(BOOK_LIBRARY_ADDRESS, BOOK_LIBRARY.abi, library, address);
 
     // get the token contract
@@ -134,6 +151,7 @@ class App extends React.Component<any, any> {
 
     await this.setState({
       library,
+      signer,
       chainId: network.chainId,
       address,
       connected: true,
@@ -256,7 +274,7 @@ class App extends React.Component<any, any> {
             </SContent>
           }
 
-          { this.state.connected && <LibraryInteract contract={ this.libraryContract } tokenWrappedContract={ this.tokenWrappedContract } tokenContract={ this.tokenContract } walletAddress={ this.state.address } /> }
+          { this.state.connected && <LibraryInteract signer={ this.state.signer } contract={ this.libraryContract } tokenWrappedContract={ this.tokenWrappedContract } tokenContract={ this.tokenContract } walletAddress={ this.state.address } /> }
         </Column>
       </SLayout>
     );

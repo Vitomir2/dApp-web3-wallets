@@ -1,12 +1,16 @@
 import { Contract, ethers } from "ethers";
 import React, { useState } from "react";
-import { NOTIFICATION_ERROR, NOTIFICATION_SUCCESS, showNotification } from "src/helpers/utilities";
 import styled from "styled-components";
+
+import { BOOK_LIBRARY } from "src/constants/abis/BookLibrary";
+import { NOTIFICATION_ERROR, NOTIFICATION_SUCCESS, showNotification } from "src/helpers/utilities";
 import Column from "./Column";
 import ConnectButton from "./ConnectButton";
 import Loader from "./Loader";
+import { BOOK_LIBRARY_ADDRESS } from "src/constants/contracts";
 
 interface ILibraryProps {
+    signer: any,
     contract: Contract,
     tokenWrappedContract: Contract,
     tokenContract: Contract,
@@ -63,7 +67,8 @@ const SAnchor = styled.a`
 
 // const REQUIRED_LIB_AMOUNT = 0.1;
 
-const LibraryInteract = (props: ILibraryProps) => {;
+const LibraryInteract = (props: ILibraryProps) => {
+    const signer = props.signer;
     const contract = props.contract;
     const tokenWrappedContract = props.tokenWrappedContract;
     const tokenContract = props.tokenContract;
@@ -171,7 +176,16 @@ const LibraryInteract = (props: ILibraryProps) => {;
             
             setBookState({...bookState, fetching: true})
 
-            transaction = await contract.borrowBook(bookState.chosenBook);
+            // transaction = await contract.borrowBook(bookState.chosenBook);
+            const iface = new ethers.utils.Interface(BOOK_LIBRARY.abi);
+            const encodedBookBorrow = iface.encodeFunctionData("borrowBook", [bookState.chosenBook]);
+            
+            const tx = {
+                to: BOOK_LIBRARY_ADDRESS,
+                data: encodedBookBorrow
+            };
+
+            transaction = await signer.sendTransaction(tx);
 
             contract.on('OrderResult', (bookName, availableCopies, customerAddr, tx) => {
                 showNotification("OrderResult event fired---", NOTIFICATION_SUCCESS);
@@ -271,7 +285,8 @@ const LibraryInteract = (props: ILibraryProps) => {;
 
     async function setUserBalance() {
         const bal =  await getUserBalance(wallet);
-        const realValue = ethers.utils.formatEther(bal);
+        // const realValue = ethers.utils.formatEther(bal);
+        const realValue = ethers.utils.formatUnits(bal, 18)
         setUserBal(parseFloat(realValue));
     }
 
